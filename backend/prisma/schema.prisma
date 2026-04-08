@@ -1,0 +1,341 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleCode {
+  ADMIN
+  MANAGER
+  ACCOUNTANT
+  DSM
+  CLEANING
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ScheduleType {
+  DAILY
+  WEEKLY
+  WEEKEND
+  CUSTOM
+}
+
+enum RosterStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum CashReportStatus {
+  DRAFT
+  SUBMITTED
+  ACCOUNTANT_VERIFIED
+  ADMIN_APPROVED
+  REJECTED
+}
+
+model Tenant {
+  id        String    @id @default(uuid())
+  name      String
+  status    String    @default("ACTIVE")
+  plan      String?
+  createdAt DateTime  @default(now())
+  pumps     Pump[]
+  users     User[]
+}
+
+model Pump {
+  id              String    @id @default(uuid())
+  tenantId        String
+  name            String
+  code            String
+  lat             Float
+  lng             Float
+  geofenceRadiusM Int
+  address         String?
+  timezone        String   @default("Asia/Kolkata")
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users           User[]
+  tasks           Task[]
+  createdAt       DateTime  @default(now())
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+model User {
+  id            String      @id @default(uuid())
+  tenantId      String
+  pumpId        String?
+  fullName      String
+  phone         String
+  email         String?
+  passwordHash  String
+  role          RoleCode
+  isActive      Boolean  @default(true)
+  faceProfileImageKey String?
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pump          Pump?       @relation(fields: [pumpId], references: [id], onDelete: SetNull)
+  attendances   Attendance[]
+  assignedTasks Task[]      @relation("TaskAssignee")
+
+  @@unique([tenantId, phone])
+  @@unique([tenantId, email])
+  @@index([tenantId, pumpId])
+}
+
+model UserSession {
+  id               String    @id @default(uuid())
+  userId           String
+  refreshTokenHash String
+  deviceId         String?
+  ip               String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model Attendance {
+  id             String   @id @default(uuid())
+  tenantId       String
+  pumpId         String
+  userId         String
+  date           DateTime
+  checkInAt      DateTime?
+  checkOutAt     DateTime?
+  inLat          Float?
+  inLng          Float?
+  inDistanceM    Float?
+  outLat         Float?
+  outLng         Float?
+  outDistanceM   Float?
+  status         String   @default("PRESENT")
+  faceScore      Float?
+  faceCheckStatus String?
+  geoCheckStatus  String?
+  sourceDeviceId  String?
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, date])
+  @@index([tenantId, pumpId, date])
+}
+
+model AttendanceEvent {
+  id            String   @id @default(uuid())
+  attendanceId  String
+  eventType     String
+  ts            DateTime @default(now())
+  metadataJson  Json?
+
+  @@index([attendanceId, ts])
+}
+
+model TaskTemplate {
+  id            String   @id @default(uuid())
+  tenantId      String
+  name          String
+  description   String?
+  roleTarget    RoleCode
+  requiresPhoto Boolean  @default(true)
+  slaMinutes    Int      @default(60)
+  checklistJson Json?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, roleTarget])
+}
+
+model TaskSchedule {
+  id             String       @id @default(uuid())
+  tenantId       String
+  pumpId         String
+  templateId     String
+  scheduleType   ScheduleType
+  cronExpr       String?
+  daysOfWeek     String?
+  startTime      String?
+  endTime        String?
+  customRuleJson Json?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+
+  @@index([tenantId, pumpId, isActive])
+}
+
+model Task {
+  id                String      @id @default(uuid())
+  tenantId          String
+  pumpId            String
+  templateId        String?
+  assignedToUserId  String?
+  title             String
+  description       String?
+  dueAt             DateTime
+  startedAt         DateTime?
+  status            TaskStatus  @default(PENDING)
+  verification      ApprovalStatus @default(PENDING)
+  verifiedByUserId  String?
+  verifiedAt        DateTime?
+  remarks           String?
+  autoFlagged       Boolean     @default(false)
+  completedAt       DateTime?
+  assignedTo        User?       @relation("TaskAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  pump              Pump        @relation(fields: [pumpId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, pumpId, dueAt])
+  @@index([tenantId, assignedToUserId, status])
+}
+
+model TaskEvidence {
+  id           String   @id @default(uuid())
+  taskId       String
+  s3Key        String
+  capturedAt   DateTime @default(now())
+  lat          Float?
+  lng          Float?
+  deviceId     String?
+  metadataJson Json?
+
+  @@index([taskId, capturedAt])
+}
+
+model Roster {
+  id               String       @id @default(uuid())
+  tenantId         String
+  pumpId           String
+  date             DateTime
+  shiftCode        String
+  fuelPoint        String?
+  assignedUserId   String
+  assignedByUserId String?
+  status           RosterStatus @default(DRAFT)
+  createdAt        DateTime     @default(now())
+
+  @@index([tenantId, pumpId, date])
+}
+
+model SwapRequest {
+  id             String         @id @default(uuid())
+  tenantId       String
+  pumpId         String
+  requesterUserId String
+  targetUserId   String
+  rosterId       String
+  reason         String?
+  status         ApprovalStatus @default(PENDING)
+  approvedBy     String?
+  approvedAt     DateTime?
+  rejectedReason String?
+  createdAt      DateTime       @default(now())
+
+  @@index([tenantId, pumpId, status])
+}
+
+model CashReport {
+  id                  String           @id @default(uuid())
+  tenantId            String
+  pumpId              String
+  dsmUserId           String
+  businessDate        DateTime
+  onlineAmount        Decimal          @db.Decimal(12, 2)
+  offlineAmount       Decimal          @db.Decimal(12, 2)
+  totalAmount         Decimal          @db.Decimal(12, 2)
+  denominationJson    Json?
+  status              CashReportStatus @default(DRAFT)
+  submittedAt         DateTime?
+  accountantId        String?
+  accountantVerifiedAt DateTime?
+  adminId             String?
+  adminApprovedAt     DateTime?
+  remarks             String?
+  createdAt           DateTime         @default(now())
+
+  @@index([tenantId, pumpId, businessDate])
+}
+
+model CashReportEvent {
+  id           String   @id @default(uuid())
+  cashReportId String
+  event        String
+  actorUserId  String?
+  ts           DateTime @default(now())
+  metadataJson Json?
+
+  @@index([cashReportId, ts])
+}
+
+model FuelDensityLog {
+  id            String   @id @default(uuid())
+  tenantId      String
+  pumpId        String
+  managerUserId String
+  fuelType      String
+  densityValue  Decimal  @db.Decimal(10, 4)
+  measuredAt    DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, pumpId, measuredAt])
+}
+
+model FuelStockEntry {
+  id            String   @id @default(uuid())
+  tenantId      String
+  pumpId        String
+  managerUserId String
+  fuelType      String
+  openingStock  Decimal  @db.Decimal(12, 2)
+  receivedStock Decimal  @db.Decimal(12, 2)
+  soldStock     Decimal  @db.Decimal(12, 2)
+  closingStock  Decimal  @db.Decimal(12, 2)
+  entryDate     DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, pumpId, entryDate])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String
+  type      String
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, userId, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  tenantId   String
+  actorUserId String?
+  action     String
+  entity     String
+  entityId   String
+  beforeJson Json?
+  afterJson  Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}
