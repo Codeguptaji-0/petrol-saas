@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { CashReportStatus } from "@prisma/client";
+import { CashReportStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 
 @Injectable()
@@ -11,6 +11,12 @@ export class CashService {
     body: { businessDate: string; onlineAmount: number; offlineAmount: number; denominationJson?: unknown }
   ) {
     const total = body.onlineAmount + body.offlineAmount;
+    const denominationJson =
+      body.denominationJson === undefined
+        ? undefined
+        : body.denominationJson === null
+          ? Prisma.JsonNull
+          : (body.denominationJson as Prisma.InputJsonValue);
     return this.prisma.cashReport.create({
       data: {
         tenantId: user.tenantId,
@@ -20,7 +26,7 @@ export class CashService {
         onlineAmount: body.onlineAmount,
         offlineAmount: body.offlineAmount,
         totalAmount: total,
-        denominationJson: body.denominationJson ?? null,
+        denominationJson,
         status: CashReportStatus.SUBMITTED,
         submittedAt: new Date()
       }

@@ -58,7 +58,6 @@ export class AttendanceService {
         inLat: dto.lat,
         inLng: dto.lng,
         inDistanceM: distance,
-        geoCheckPassed: true,
         faceCheckStatus: "PASSED",
         geoCheckStatus: "PASSED",
         faceScore
