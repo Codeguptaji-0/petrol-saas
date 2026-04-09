@@ -17,7 +17,16 @@ async function bootstrap(): Promise<void> {
     .setTitle("Petrol Pump SaaS API")
     .setDescription("Enterprise staff management API")
     .setVersion("1.0.0")
-    .addBearerAuth()
+    // Define bearer auth scheme + apply it globally so Swagger sends Authorization header.
+    .addBearerAuth(
+      {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT"
+      },
+      "bearer"
+    )
+    .addSecurityRequirements("bearer")
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup("api/docs", app, document);
