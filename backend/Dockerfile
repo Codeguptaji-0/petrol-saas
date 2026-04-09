@@ -3,7 +3,7 @@
 FROM node:20-bullseye-slim AS deps
 WORKDIR /app
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && apt-get install -y --no-install-recommends openssl libssl1.1 libstdc++6 ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json* ./
 RUN npm install
@@ -11,7 +11,7 @@ RUN npm install
 FROM node:20-bullseye-slim AS build
 WORKDIR /app
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && apt-get install -y --no-install-recommends openssl libssl1.1 libstdc++6 ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json* ./
@@ -25,7 +25,7 @@ FROM node:20-bullseye-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && apt-get install -y --no-install-recommends openssl libssl1.1 libstdc++6 ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 # Must come from build stage: `prisma generate` writes node_modules/.prisma (enums, client).
 # Copying only deps' node_modules leaves @prisma/client without generated exports → RoleCode undefined at runtime.
