@@ -21,6 +21,7 @@ import { StorageModule } from "./modules/storage/storage.module";
 import { AuditInterceptor } from "./common/interceptors/audit.interceptor";
 import { ThrottlerModule } from "@nestjs/throttler";
 import { ThrottlerGuard } from "@nestjs/throttler";
+import { BootstrapModule } from "./modules/bootstrap/bootstrap.module";
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ThrottlerGuard } from "@nestjs/throttler";
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
     PrismaModule,
     InfraModule,
+    BootstrapModule,
     AuthModule,
     TenantsModule,
     PumpsModule,
