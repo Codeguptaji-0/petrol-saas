@@ -19,7 +19,10 @@ services:
     ports:
       - "3000:3000"
 
+  # Run once after deploy: docker compose -f docker-compose.ec2.yml run --rm migrate
+  # (Compose enables this service's profile automatically for `run`.)
   migrate:
+    profiles: [migrate]
     build:
       context: .
       dockerfile: Dockerfile
