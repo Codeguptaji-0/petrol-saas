@@ -1,6 +1,6 @@
-# Debian slim (not Alpine): Prisma schema/query engines expect glibc + OpenSSL and
-# often fail on musl with "Could not parse schema engine response" / OpenSSL warnings.
-FROM node:20-bookworm-slim AS deps
+# Debian slim (not Alpine): Prisma engines need glibc + libssl.
+# Use bullseye (OpenSSL 1.1) for best Prisma compatibility on server images.
+FROM node:20-bullseye-slim AS deps
 WORKDIR /app
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
@@ -8,7 +8,7 @@ RUN apt-get update \
 COPY package.json package-lock.json* ./
 RUN npm install
 
-FROM node:20-bookworm-slim AS build
+FROM node:20-bullseye-slim AS build
 WORKDIR /app
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
@@ -21,7 +21,7 @@ COPY src ./src
 RUN npx prisma generate
 RUN npm run build
 
-FROM node:20-bookworm-slim AS runtime
+FROM node:20-bullseye-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apt-get update \
